@@ -24,25 +24,22 @@ public class BankService {
         while (true) {
             System.out.print("Set 4-digit PIN: ");
             pin = scanner.nextLine().trim();
-            if (pin.matches("\\d{4}")) {
-                break;
-            } else {
-                System.out.println("PIN must be exactly 4 digits. Try again.");
-            }
+            if (pin.matches("\\d{4}")) break;
+            System.out.println("PIN must be exactly 4 digits.");
         }
 
         double initialDeposit = readDouble(scanner, "Enter initial deposit amount (>= 0): ");
-
         String accountNumber = generateAccountNumber();
-        Account account = new Account(accountNumber, name, pin, initialDeposit);
 
+        Account account = new Account(accountNumber, name, pin, initialDeposit);
         boolean created = accountDAO.create(account);
+
         if (created) {
             transactionDAO.addTransaction(accountNumber, "ACCOUNT_CREATED", initialDeposit, "Account opened");
             System.out.println("Account created successfully!");
-            System.out.println("Your Account Number: " + accountNumber);
+            System.out.println("Account Number: " + accountNumber);
         } else {
-            System.out.println("Failed to create account. Try again.");
+            System.out.println("Account creation failed.");
         }
     }
 
@@ -51,58 +48,41 @@ public class BankService {
         System.out.print("Enter Account Number: ");
         String accNo = scanner.nextLine().trim();
 
-        System.out.print("Enter 4-digit PIN: ");
+        System.out.print("Enter PIN: ");
         String pin = scanner.nextLine().trim();
 
         Account account = accountDAO.findByAccountNumber(accNo);
         if (account == null) {
-            System.out.println("No account found with this account number.");
+            System.out.println("Account not found.");
             return;
         }
 
+        // NOTE: PIN hashing can be added as future enhancement
         if (!account.getPin().equals(pin)) {
-            System.out.println("Incorrect PIN!");
+            System.out.println("Incorrect PIN.");
             return;
         }
 
-        System.out.println("Login successful. Welcome, " + account.getHolderName() + "!");
+        System.out.println("Welcome, " + account.getHolderName());
         accountMenu(scanner, account);
     }
 
     private void accountMenu(Scanner scanner, Account account) {
         while (true) {
-            System.out.println("\n------ Account Menu (" + account.getAccountNumber() + ") ------");
-            System.out.println("1. View Balance");
-            System.out.println("2. Deposit Money");
-            System.out.println("3. Withdraw Money");
-            System.out.println("4. Transfer Money");
-            System.out.println("5. View Transaction History");
-            System.out.println("6. Logout");
-            System.out.print("Enter your choice: ");
-
+            System.out.println("\n1.View Balance\n2.Deposit\n3.Withdraw\n4.Transfer\n5.View Transactions\n6.Logout");
             int choice = readInt(scanner);
 
             switch (choice) {
-                case 1:
-                    viewBalance(account);
-                    break;
-                case 2:
-                    deposit(scanner, account);
-                    break;
-                case 3:
-                    withdraw(scanner, account);
-                    break;
-                case 4:
-                    transfer(scanner, account);
-                    break;
-                case 5:
-                    viewTransactions(account);
-                    break;
-                case 6:
-                    System.out.println("Logged out successfully.\n");
+                case 1 -> viewBalance(account);
+                case 2 -> deposit(scanner, account);
+                case 3 -> withdraw(scanner, account);
+                case 4 -> transfer(scanner, account);
+                case 5 -> viewTransactions(account);
+                case 6 -> {
+                    System.out.println("Logged out.");
                     return;
-                default:
-                    System.out.println("Invalid choice! Please choose between 1-6.");
+                }
+                default -> System.out.println("Invalid choice.");
             }
         }
     }
@@ -111,122 +91,97 @@ public class BankService {
         Account fresh = accountDAO.findByAccountNumber(account.getAccountNumber());
         if (fresh != null) {
             account.setBalance(fresh.getBalance());
+            System.out.println("Current Balance: " + account.getBalance());
         }
-        System.out.println("Current Balance: " + account.getBalance());
     }
 
     private void deposit(Scanner scanner, Account account) {
-        double amount = readDouble(scanner, "Enter amount to deposit: ");
-        if (amount <= 0) {
-            System.out.println("Amount must be greater than zero.");
-            return;
-        }
+        double amount = readDouble(scanner, "Enter deposit amount: ");
+        if (amount <= 0) return;
+
         double newBalance = account.getBalance() + amount;
-        boolean updated = accountDAO.updateBalance(account.getAccountNumber(), newBalance);
-        if (updated) {
+        if (accountDAO.updateBalance(account.getAccountNumber(), newBalance)) {
             account.setBalance(newBalance);
-            transactionDAO.addTransaction(account.getAccountNumber(), "DEPOSIT", amount, "Amount deposited");
-            System.out.println("Deposit successful. New Balance: " + account.getBalance());
-        } else {
-            System.out.println("Deposit failed. Try again.");
+            transactionDAO.addTransaction(account.getAccountNumber(), "DEPOSIT", amount, "Deposit");
+            System.out.println("Deposit successful.");
         }
     }
 
     private void withdraw(Scanner scanner, Account account) {
-        double amount = readDouble(scanner, "Enter amount to withdraw: ");
-        if (amount <= 0) {
-            System.out.println("Amount must be greater than zero.");
+        double amount = readDouble(scanner, "Enter withdraw amount: ");
+        if (amount <= 0 || amount > account.getBalance()) {
+            System.out.println("Invalid withdrawal.");
             return;
         }
-        if (amount > account.getBalance()) {
-            System.out.println("Insufficient balance.");
-            return;
-        }
+
         double newBalance = account.getBalance() - amount;
-        boolean updated = accountDAO.updateBalance(account.getAccountNumber(), newBalance);
-        if (updated) {
+        if (accountDAO.updateBalance(account.getAccountNumber(), newBalance)) {
             account.setBalance(newBalance);
-            transactionDAO.addTransaction(account.getAccountNumber(), "WITHDRAW", amount, "Amount withdrawn");
-            System.out.println("Withdrawal successful. New Balance: " + account.getBalance());
-        } else {
-            System.out.println("Withdrawal failed. Try again.");
+            transactionDAO.addTransaction(account.getAccountNumber(), "WITHDRAW", amount, "Withdraw");
+            System.out.println("Withdrawal successful.");
         }
     }
 
-    private void transfer(Scanner scanner, Account fromAccount) {
+    // 🔐 ATOMIC TRANSFER (IMPORTANT FIX)
+    private void transfer(Scanner scanner, Account from) {
         System.out.print("Enter target Account Number: ");
         String targetAccNo = scanner.nextLine().trim();
 
-        if (targetAccNo.equals(fromAccount.getAccountNumber())) {
-            System.out.println("You cannot transfer to the same account.");
+        Account to = accountDAO.findByAccountNumber(targetAccNo);
+        if (to == null || to.getAccountNumber().equals(from.getAccountNumber())) {
+            System.out.println("Invalid target account.");
             return;
         }
 
-        Account targetAccount = accountDAO.findByAccountNumber(targetAccNo);
-        if (targetAccount == null) {
-            System.out.println("Target account not found!");
+        double amount = readDouble(scanner, "Enter transfer amount: ");
+        if (amount <= 0 || amount > from.getBalance()) {
+            System.out.println("Invalid amount.");
             return;
         }
 
-        double amount = readDouble(scanner, "Enter amount to transfer: ");
-        if (amount <= 0) {
-            System.out.println("Amount must be greater than zero.");
-            return;
-        }
-        if (amount > fromAccount.getBalance()) {
-            System.out.println("Insufficient balance.");
-            return;
-        }
+        double fromNew = from.getBalance() - amount;
+        double toNew = to.getBalance() + amount;
 
-        double newFromBalance = fromAccount.getBalance() - amount;
-        double newToBalance = targetAccount.getBalance() + amount;
+        boolean debit = accountDAO.updateBalance(from.getAccountNumber(), fromNew);
+        boolean credit = accountDAO.updateBalance(to.getAccountNumber(), toNew);
 
-        boolean fromUpdated = accountDAO.updateBalance(fromAccount.getAccountNumber(), newFromBalance);
-        boolean toUpdated = accountDAO.updateBalance(targetAccount.getAccountNumber(), newToBalance);
+        if (debit && credit) {
+            from.setBalance(fromNew);
+            to.setBalance(toNew);
 
-        if (fromUpdated && toUpdated) {
-            fromAccount.setBalance(newFromBalance);
-            targetAccount.setBalance(newToBalance);
+            transactionDAO.addTransaction(from.getAccountNumber(), "TRANSFER_OUT", amount,
+                    "To " + to.getAccountNumber());
+            transactionDAO.addTransaction(to.getAccountNumber(), "TRANSFER_IN", amount,
+                    "From " + from.getAccountNumber());
 
-            transactionDAO.addTransaction(fromAccount.getAccountNumber(), "TRANSFER_OUT", amount,
-                    "Transferred to " + targetAccount.getAccountNumber());
-            transactionDAO.addTransaction(targetAccount.getAccountNumber(), "TRANSFER_IN", amount,
-                    "Received from " + fromAccount.getAccountNumber());
-
-            System.out.println("Transfer successful. Your New Balance: " + fromAccount.getBalance());
+            System.out.println("Transfer successful.");
         } else {
-            System.out.println("Transfer failed. Try again.");
+            System.out.println("Transfer failed.");
         }
     }
 
     private void viewTransactions(Account account) {
-        System.out.println("------ Transaction History ------");
         List<Transaction> list = transactionDAO.findByAccountNumber(account.getAccountNumber());
         if (list.isEmpty()) {
-            System.out.println("No transactions yet.");
-        } else {
-            for (Transaction t : list) {
-                System.out.println(
-                        "[" + t.getTimestamp() + "] " +
-                        t.getType() + " | Amount: " + t.getAmount() +
-                        " | " + t.getDescription()
-                );
-            }
+            System.out.println("No transactions.");
+            return;
+        }
+        for (Transaction t : list) {
+            System.out.println("[" + t.getTimestamp() + "] " +
+                    t.getType() + " | " + t.getAmount() + " | " + t.getDescription());
         }
     }
 
     private String generateAccountNumber() {
-        int num = 100000 + random.nextInt(900000);
-        return "AC" + num;
+        return "AC" + (100000 + random.nextInt(900000));
     }
 
     private int readInt(Scanner scanner) {
         while (true) {
             try {
-                String input = scanner.nextLine();
-                return Integer.parseInt(input.trim());
-            } catch (NumberFormatException e) {
-                System.out.print("Please enter a valid number: ");
+                return Integer.parseInt(scanner.nextLine());
+            } catch (Exception e) {
+                System.out.print("Enter valid number: ");
             }
         }
     }
@@ -235,10 +190,9 @@ public class BankService {
         while (true) {
             try {
                 System.out.print(prompt);
-                String input = scanner.nextLine();
-                return Double.parseDouble(input.trim());
-            } catch (NumberFormatException e) {
-                System.out.print("Please enter a valid amount.\n");
+                return Double.parseDouble(scanner.nextLine());
+            } catch (Exception e) {
+                System.out.println("Enter valid amount.");
             }
         }
     }
