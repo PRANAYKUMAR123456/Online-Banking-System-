@@ -12,7 +12,9 @@ import java.util.List;
 public class TransactionDAO {
 
     public void addTransaction(String accountNumber, String type, double amount, String description) {
-        String sql = "INSERT INTO transactions (account_number, type, amount, description) VALUES (?,?,?,?)";
+        String sql = "INSERT INTO transactions (account_number, type, amount, timestamp, description) " +
+                     "VALUES (?,?,?,CURRENT_TIMESTAMP,?)";
+
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
@@ -22,6 +24,7 @@ public class TransactionDAO {
             ps.setString(4, description);
 
             ps.executeUpdate();
+
         } catch (SQLException e) {
             System.out.println("Error adding transaction: " + e.getMessage());
         }
@@ -29,6 +32,7 @@ public class TransactionDAO {
 
     public List<Transaction> findByAccountNumber(String accountNumber) {
         List<Transaction> list = new ArrayList<>();
+
         String sql = "SELECT transaction_id, account_number, type, amount, timestamp, description " +
                      "FROM transactions WHERE account_number = ? ORDER BY timestamp DESC";
 
@@ -44,12 +48,15 @@ public class TransactionDAO {
                 String type = rs.getString("type");
                 double amount = rs.getDouble("amount");
                 Timestamp ts = rs.getTimestamp("timestamp");
-                LocalDateTime time = ts.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+                LocalDateTime time = ts.toInstant()
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDateTime();
                 String desc = rs.getString("description");
 
                 Transaction t = new Transaction(id, accNo, type, amount, time, desc);
                 list.add(t);
             }
+
         } catch (SQLException e) {
             System.out.println("Error fetching transactions: " + e.getMessage());
         }
