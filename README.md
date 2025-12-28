@@ -1,11 +1,11 @@
-Online Banking System – README
+🏦 Online Banking System – README
 
 📌 Project Overview
 
-The Online Banking System is a Java-based console application designed to simulate basic banking operations.
-It demonstrates concepts of OOP, JDBC, and MySQL database connectivity.
+- The Online Banking System is a Java-based console application developed to simulate real-world banking operations such as account management and transactions.
+It demonstrates the practical use of Object-Oriented Programming (OOP) concepts, JDBC, and MySQL database connectivity with a focus on secure and clean coding practices.
 
-This project is suitable for academic submissions, practical exams, and Java learning purposes.
+This project is suitable for academic submissions, practical exams, and Review-2 evaluations, and helps students understand how real banking systems work at a basic level.
 
 ✨ Features
 
@@ -49,7 +49,7 @@ This project is suitable for academic submissions, practical exams, and Java lea
 
 🛠️ Technologies Used
 
-Java (JDK 8+)
+🔹Java (JDK 8+)
 
 🔹MySQL Database
 
@@ -58,6 +58,16 @@ Java (JDK 8+)
 🔹OOP principles
 
 🔹Exception handling
+
+▶ How to Run the Project
+
+🔹 Create the database using banking.sql
+
+🔹 Update database credentials in DBConnection.java
+
+🔹 Compile and run Main.java
+
+🔹 Use the console menu to interact with the system
 
 📥 Future Enhancements
 
@@ -68,3 +78,8 @@ Java (JDK 8+)
 🔹 Email/SMS OTP
 
 🔹 Encryption for PIN & transactions
+
+🏁 Conclusion
+
+This project demonstrates a secure, modular, and real-world inspired banking system using Java and MySQL.
+By following layered architecture, secure database access, and proper validation, the project meets Review-2 academic standards and includes extra-effort features beyond basic requirements.
